@@ -42,7 +42,10 @@ METRICS: tuple[Metric, ...] = (
         "USD",
         True,
     ),
-    Metric("net_income", "net income", ("NetIncomeLoss",), "USD", True),
+    # Fallbacks are used only when the filing does not tag the standard concept for
+    # that period. They include noncontrolling interests (e.g. PNC and JNJ in their
+    # FY2024-FY2025 10-Ks); each question records which concept its answer came from.
+    Metric("net_income", "net income", ("NetIncomeLoss", "ProfitLoss"), "USD", True),
     Metric(
         "eps_diluted",
         "diluted earnings per share",
@@ -62,7 +65,10 @@ METRICS: tuple[Metric, ...] = (
     Metric(
         "stockholders_equity",
         "total stockholders' equity",
-        ("StockholdersEquity",),
+        (
+            "StockholdersEquity",
+            "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+        ),
         "USD",
         False,
     ),

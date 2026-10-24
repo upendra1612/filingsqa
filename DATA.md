@@ -30,5 +30,9 @@ Known limits, documented rather than hidden:
   coverage is lower for them. That is expected.
 - XBRL values are in full units (e.g. 1,234,000,000), while 10-K tables usually
   say "in millions". Answer scoring must normalize scale.
+- Some filers tag only the broader concept for a line. Net income falls back to
+  `ProfitLoss` and equity to `StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest`
+  (both include noncontrolling interests) only when the standard tag is absent for
+  that filing and period; this applies to PNC and JNJ in the current corpus.
 - XBRL `companyfacts` excludes dimensional (segment-level) facts, so segment
   questions come from the hand-written set.

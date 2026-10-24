@@ -72,3 +72,25 @@ def test_build_questions_end_to_end():
 
 def test_format_period_has_no_leading_zero():
     assert format_period("2024-09-01") == "September 1, 2024"
+
+
+NET_INCOME = next(m for m in METRICS if m.key == "net_income")
+EQUITY = next(m for m in METRICS if m.key == "stockholders_equity")
+
+
+def test_net_income_falls_back_to_profit_loss_when_standard_tag_absent():
+    # Mirrors PNC's FY2025 10-K: only ProfitLoss is tagged for the year.
+    f = facts(ProfitLoss={"USD": [fy(6_997_000_000)]})
+    assert find_fact(f, NET_INCOME, ACCN, END) == ("ProfitLoss", 6_997_000_000)
+
+
+def test_standard_tag_wins_over_fallback():
+    f = facts(NetIncomeLoss={"USD": [fy(6_900)]}, ProfitLoss={"USD": [fy(6_997)]})
+    assert find_fact(f, NET_INCOME, ACCN, END) == ("NetIncomeLoss", 6_900)
+
+
+def test_equity_falls_back_to_total_equity_including_nci():
+    # Mirrors JNJ's FY2025 10-K.
+    concept = "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+    f = facts(**{concept: {"USD": [{"end": END, "val": 81_544, "accn": ACCN, "form": "10-K"}]}})
+    assert find_fact(f, EQUITY, ACCN, END) == (concept, 81_544)
