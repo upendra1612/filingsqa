@@ -1,0 +1,36 @@
+# One ticker per line. Lines starting with # are ignored.
+# Mix of banks, card issuers, insurers and non-financials so retrieval has to
+# handle very different 10-K structures.
+
+# Banks
+JPM
+BAC
+WFC
+C
+GS
+MS
+USB
+PNC
+
+# Card issuers / consumer finance
+AXP
+COF
+
+# Insurers
+PGR
+TRV
+ALL
+MET
+PRU
+AIG
+CB
+
+# Non-financials (contrast cases)
+AAPL
+MSFT
+AMZN
+WMT
+JNJ
+PEP
+KO
+NKE

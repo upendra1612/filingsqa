@@ -1,0 +1,12 @@
+# Downloaded filings and caches are rebuilt by scripts; never commit them
+data/
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
