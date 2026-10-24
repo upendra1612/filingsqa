@@ -1,0 +1,215 @@
+{
+  "seed": 7,
+  "results": [
+    {
+      "id": "xbrl-MS-2025-12-31-revenue",
+      "ticker": "MS",
+      "expected": 70645000000,
+      "status": "match",
+      "label_in_filing": "Net revenues",
+      "displayed": "70,645",
+      "scale": "millions",
+      "occurrences": 3,
+      "question": "What was MORGAN STANLEY's total revenue for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-BAC-2025-12-31-revenue",
+      "ticker": "BAC",
+      "expected": 113097000000,
+      "status": "match",
+      "label_in_filing": "Total revenue, net of interest expense",
+      "displayed": "113,097",
+      "scale": "millions",
+      "occurrences": 2,
+      "question": "What was BANK OF AMERICA CORP /DE/'s total revenue for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-C-2025-12-31-revenue",
+      "ticker": "C",
+      "expected": 85225000000,
+      "status": "match",
+      "label_in_filing": "Total revenues, net of interest expense(1)",
+      "displayed": "85,225",
+      "scale": "millions",
+      "occurrences": 3,
+      "question": "What was CITIGROUP INC's total revenue for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-PNC-2024-12-31-revenue",
+      "ticker": "PNC",
+      "expected": 21555000000,
+      "status": "match",
+      "label_in_filing": "Total revenue",
+      "displayed": "21,555",
+      "scale": "millions",
+      "occurrences": 2,
+      "question": "What was PNC FINANCIAL SERVICES GROUP, INC.'s total revenue for the fiscal year ended December 31, 2024?"
+    },
+    {
+      "id": "xbrl-NKE-2026-05-31-total_assets",
+      "ticker": "NKE",
+      "expected": 38410000000,
+      "status": "match",
+      "label_in_filing": "TOTAL ASSETS",
+      "displayed": "38,410",
+      "scale": "millions",
+      "occurrences": 1,
+      "question": "What was NIKE, Inc.'s total assets for the fiscal year ended May 31, 2026?"
+    },
+    {
+      "id": "xbrl-PRU-2025-12-31-net_income",
+      "ticker": "PRU",
+      "expected": 3576000000,
+      "status": "match",
+      "label_in_filing": "NET INCOME (LOSS) ATTRIBUTABLE TO PRUDENTIAL FINANCIAL, INC.",
+      "displayed": "3,576",
+      "scale": "millions",
+      "occurrences": 1,
+      "question": "What was PRUDENTIAL FINANCIAL INC's net income for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-MS-2025-12-31-net_income",
+      "ticker": "MS",
+      "expected": 16861000000,
+      "status": "match",
+      "label_in_filing": "Net income applicable to Morgan Stanley",
+      "displayed": "16,861",
+      "scale": "millions",
+      "occurrences": 2,
+      "question": "What was MORGAN STANLEY's net income for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-CB-2025-12-31-eps_diluted",
+      "ticker": "CB",
+      "expected": 25.68,
+      "status": "match",
+      "label_in_filing": "Diluted earnings per share attributable to Chubb",
+      "displayed": "25.68",
+      "scale": "units",
+      "occurrences": 2,
+      "question": "What was Chubb Ltd's diluted earnings per share for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-COF-2025-12-31-revenue",
+      "ticker": "COF",
+      "expected": 53434000000,
+      "status": "match",
+      "label_in_filing": "Total net revenue (loss)(2)",
+      "displayed": "53,434",
+      "scale": "millions",
+      "occurrences": 1,
+      "question": "What was CAPITAL ONE FINANCIAL CORP's total revenue for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-JNJ-2025-12-28-operating_cash_flow",
+      "ticker": "JNJ",
+      "expected": 24530000000,
+      "status": "match",
+      "label_in_filing": "Net cash flows from operating activities",
+      "displayed": "24,530",
+      "scale": "millions",
+      "occurrences": 1,
+      "question": "What was JOHNSON & JOHNSON's net cash provided by operating activities for the fiscal year ended December 28, 2025?"
+    },
+    {
+      "id": "xbrl-GS-2024-12-31-revenue",
+      "ticker": "GS",
+      "expected": 53512000000,
+      "status": "match",
+      "label_in_filing": "Total net revenues",
+      "displayed": "53,512",
+      "scale": "millions",
+      "occurrences": 3,
+      "question": "What was GOLDMAN SACHS GROUP INC's total revenue for the fiscal year ended December 31, 2024?"
+    },
+    {
+      "id": "xbrl-AAPL-2024-09-28-cash",
+      "ticker": "AAPL",
+      "expected": 29943000000,
+      "status": "match",
+      "label_in_filing": "Cash and cash equivalents",
+      "displayed": "29,943",
+      "scale": "millions",
+      "occurrences": 2,
+      "question": "What was Apple Inc.'s cash and cash equivalents for the fiscal year ended September 28, 2024?"
+    },
+    {
+      "id": "xbrl-PGR-2025-12-31-stockholders_equity",
+      "ticker": "PGR",
+      "expected": 30323000000,
+      "status": "not displayed (no visible tagged figure)"
+    },
+    {
+      "id": "xbrl-ALL-2025-12-31-eps_diluted",
+      "ticker": "ALL",
+      "expected": 38.06,
+      "status": "match",
+      "label_in_filing": "Net income (loss) applicable to common shareholders per common share - Diluted",
+      "displayed": "38.06",
+      "scale": "units",
+      "occurrences": 3,
+      "question": "What was ALLSTATE CORP's diluted earnings per share for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-WFC-2024-12-31-revenue",
+      "ticker": "WFC",
+      "expected": 82296000000,
+      "status": "not displayed (no visible tagged figure)"
+    },
+    {
+      "id": "xbrl-JPM-2025-12-31-eps_diluted",
+      "ticker": "JPM",
+      "expected": 20.02,
+      "status": "match",
+      "label_in_filing": "Diluted earnings per share",
+      "displayed": "20.02",
+      "scale": "units",
+      "occurrences": 2,
+      "question": "What was JPMORGAN CHASE & CO's diluted earnings per share for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-BAC-2025-12-31-net_income",
+      "ticker": "BAC",
+      "expected": 30509000000,
+      "status": "match",
+      "label_in_filing": "Net income",
+      "displayed": "30,509",
+      "scale": "millions",
+      "occurrences": 7,
+      "question": "What was BANK OF AMERICA CORP /DE/'s net income for the fiscal year ended December 31, 2025?"
+    },
+    {
+      "id": "xbrl-PNC-2024-12-31-stockholders_equity",
+      "ticker": "PNC",
+      "expected": 54425000000,
+      "status": "match",
+      "label_in_filing": "Total shareholders\u2019 equity",
+      "displayed": "54,425",
+      "scale": "millions",
+      "occurrences": 1,
+      "question": "What was PNC FINANCIAL SERVICES GROUP, INC.'s total stockholders' equity for the fiscal year ended December 31, 2024?"
+    },
+    {
+      "id": "xbrl-MET-2024-12-31-eps_diluted",
+      "ticker": "MET",
+      "expected": 5.94,
+      "status": "match",
+      "label_in_filing": "Diluted",
+      "displayed": "5.94",
+      "scale": "units",
+      "occurrences": 2,
+      "question": "What was METLIFE INC's diluted earnings per share for the fiscal year ended December 31, 2024?"
+    },
+    {
+      "id": "xbrl-KO-2024-12-31-net_income",
+      "ticker": "KO",
+      "expected": 10631000000,
+      "status": "match",
+      "label_in_filing": "Net Income Attributable to Shareowners of The Coca-Cola Company",
+      "displayed": "10,631",
+      "scale": "millions",
+      "occurrences": 2,
+      "question": "What was COCA COLA CO's net income for the fiscal year ended December 31, 2024?"
+    }
+  ]
+}
