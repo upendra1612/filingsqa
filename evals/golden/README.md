@@ -40,7 +40,6 @@ two displayed figures, and every not-answerable question returns zero hits for i
 keyword searches. Review them yourself before relying on them; a keyword search can
 miss an answer phrased differently.
 
-Known gap: questions for WFC, USB and PGR in `xbrl_numeric.jsonl` are currently
-unanswerable from the corpus, because those companies' financial statements are in
-exhibits we do not download yet (see `evals/results/spot_check_xbrl.md`). Exclude them
-from scoring until the exhibits are ingested.
+Status: all 366 XBRL questions are verified against the displayed figures in their filings
+(`evals/results/spot_check_xbrl.md`). The evaluator still excludes any question a future
+spot-check cannot verify.

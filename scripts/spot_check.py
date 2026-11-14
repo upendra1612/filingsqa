@@ -93,26 +93,44 @@ def parse_document(path: str):
     return root, contexts, parents, hidden
 
 
-def check(question: dict, project: Path) -> dict:
-    src = question["source"]
-    concept = src["concept"]  # e.g. us-gaap:Revenues
-    path = project / src["document"]
-    out = {"id": question["id"], "ticker": src["ticker"], "expected": question["expected"]["value"]}
-    if not path.is_file():
-        return {**out, "status": "missing document"}
-    try:
-        root, contexts, parents, hidden = parse_document(str(path))
-    except ET.ParseError as exc:
-        return {**out, "status": f"parse error: {exc}"}
-
-    candidates = []
+def find_candidates(path: Path, concept: str, period_end: str, contexts: dict):
+    """Visible, non-dimensional tagged figures for this concept and period in one document."""
+    root, _, parents, hidden = parse_document(str(path))
+    found = []
     for el in root.iter(f"{IX}nonFraction"):
         if el.get("name") != concept or el in hidden:
             continue
         c = contexts.get(el.get("contextRef"), {})
-        if c.get("has_dims") or c.get("end") != src["period_end"]:
+        if c.get("has_dims") or c.get("end") != period_end:
             continue
-        candidates.append(el)
+        found.append(el)
+    return found, parents
+
+
+def check(question: dict, project: Path) -> dict:
+    """Look for the figure in every document of the filing (primary 10-K, then exhibits)."""
+    src = question["source"]
+    out = {"id": question["id"], "ticker": src["ticker"], "expected": question["expected"]["value"]}
+    documents = src.get("documents") or [src["document"]]
+    # A filing's documents share one set of period definitions ("contexts"), usually
+    # stored in the primary 10-K's header even when the figures sit in Exhibit 13.
+    contexts: dict = {}
+    for doc in documents:
+        path = project / doc
+        if not path.is_file():
+            return {**out, "status": f"missing document {doc}"}
+        try:
+            contexts.update(parse_document(str(path))[1])
+        except ET.ParseError as exc:
+            return {**out, "status": f"parse error in {doc}: {exc}"}
+    candidates, parents, where = [], {}, None
+    for doc in documents:
+        candidates, parents = find_candidates(
+            project / doc, src["concept"], src["period_end"], contexts
+        )
+        if candidates:
+            where = doc
+            break
     if not candidates:
         return {**out, "status": "not displayed (no visible tagged figure)"}
 
@@ -129,6 +147,7 @@ def check(question: dict, project: Path) -> dict:
         "displayed": text_of(el),
         "scale": SCALE_WORD.get(scale, f"10^{scale}"),
         "occurrences": len(candidates),
+        "found_in": Path(where).name,
         "question": question["question"],
     }
 

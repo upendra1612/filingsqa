@@ -153,6 +153,7 @@ def build_questions(manifest: list[dict], facts_by_ticker: dict[str, dict]) -> t
                         "concept": f"us-gaap:{concept}",
                         "period_end": period_end,
                         "document": filing["local_path"],
+                        "documents": filing.get("documents", [filing["local_path"]]),
                     },
                     "category": "numeric_extraction",
                     "difficulty": "easy",

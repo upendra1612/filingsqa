@@ -33,23 +33,18 @@ Known limits, documented rather than hidden:
 - Cash and cash equivalents is missing for 13 banks, card issuers and insurers, which
   tag cash differently; total liabilities is missing for AMZN, KO, NKE and WMT, whose
   balance sheets show no "Total liabilities" line. Skipping these is correct.
-- **WFC, USB and PGR** put their financial statements in exhibits (PGR: Exhibit 13), not
-  in the primary 10-K document we download. Their 42 XBRL questions are unanswerable from
-  the current corpus until those exhibits are ingested.
-- XBRL values are in full units (e.g. 1,234,000,000), while 10-K tables usually
-  say "in millions". Answer scoring must normalize scale.
-- Some filers tag only the broader concept for a line. Net income falls back to
-  `ProfitLoss` and equity to `StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest`
-  (both include noncontrolling interests) only when the standard tag is absent for
-  that filing and period; this applies to PNC and JNJ in the current corpus.
+- **WFC, USB and PGR** put their financial statements in Exhibit 13. The downloader reads each
+  filing's SEC index page and downloads EX-13 alongside the primary 10-K, so these are in the corpus.
+- The corpus is each company's **latest two 10-Ks**, so it changes when companies file (Apple's FY2026
+  10-K replaced FY2024 on 2026-11-03). Company facts refresh on every download; curated questions are
+  pinned to the filings they were written from.
 - XBRL `companyfacts` excludes dimensional (segment-level) facts, so segment
   questions come from the curated set.
 
 ## Verification
 
 - `python scripts/spot_check.py --all` checks every XBRL question against the figure
-  displayed in the 10-K. Latest run: 324/366 match, 0 wrong values, 42 not found (all
-  WFC, USB, PGR). Report: `evals/results/spot_check_xbrl.md`.
+  displayed in the 10-K. Latest run (2026-11-14): 366/366 match. Report: `evals/results/spot_check_xbrl.md`.
 - `python scripts/build_curated.py` rebuilds `evals/golden/curated.jsonl` and fails if any
   quote, figure or absence check does not hold. The curated questions were drafted with
   AI assistance and verified by these checks, not hand-labeled.

@@ -18,18 +18,32 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from ixfacts import facts
 
+# Each company's questions were written from one specific filing. Pin them, so that a
+# newer 10-K entering the corpus (e.g. Apple's FY2026, filed Nov 2026) cannot silently
+# change which document the questions are checked against.
+PINNED = {
+    "AAPL": ("0000320193-25-000079", "2024-09-28"),
+    "JPM": ("0001628280-26-008131", "2024-12-31"),
+    "KO": ("0001628280-26-010047", "2024-12-31"),
+    "MSFT": ("0001193125-26-323660", "2025-06-30"),
+    "WMT": ("0000104169-26-000055", "2025-01-31"),
+    "NKE": ("0000320187-26-000088", None),
+    "AMZN": ("0001018724-26-000004", "2024-12-31"),
+    "BAC": ("0000070858-26-000157", "2024-12-31"),
+    "AXP": ("0000004962-26-000080", "2024-12-31"),
+    "MET": ("0001099219-26-000013", None),
+    "PEP": ("0000077476-26-000007", "2024-12-28"),
+    "GS": ("0000886982-26-000091", None),
+    "TRV": ("0000086312-26-000065", "2024-12-31"),
+}  # ticker -> (accession the questions come from, prior fiscal year end for YoY)
+
 m = [json.loads(line) for line in open("data/manifest.jsonl")]
-latest = {}
-for r in m:
-    if r["ticker"] not in latest or r["report_date"] > latest[r["ticker"]]["report_date"]:
-        latest[r["ticker"]] = r
-prior = {
-    t: max(
-        (r for r in m if r["ticker"] == t and r["report_date"] < latest[t]["report_date"]),
-        key=lambda r: r["report_date"],
-    )
-    for t in latest
-}
+by_accession = {r["accession"]: r for r in m}
+missing = [t for t, (acc, _) in PINNED.items() if acc not in by_accession]
+if missing:
+    sys.exit(f"pinned filings not in data/manifest.jsonl for: {', '.join(missing)}")
+latest = {t: by_accession[acc] for t, (acc, _) in PINNED.items()}
+prior = {t: {"report_date": prev} for t, (_, prev) in PINNED.items() if prev}
 
 
 def possessive(name):

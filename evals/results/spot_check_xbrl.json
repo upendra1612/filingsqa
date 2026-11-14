@@ -10,6 +10,7 @@
       "displayed": "70,645",
       "scale": "millions",
       "occurrences": 3,
+      "found_in": "ms-20251231.htm",
       "question": "What was MORGAN STANLEY's total revenue for the fiscal year ended December 31, 2025?"
     },
     {
@@ -21,6 +22,7 @@
       "displayed": "113,097",
       "scale": "millions",
       "occurrences": 2,
+      "found_in": "bac-20251231.htm",
       "question": "What was BANK OF AMERICA CORP /DE/'s total revenue for the fiscal year ended December 31, 2025?"
     },
     {
@@ -32,6 +34,7 @@
       "displayed": "85,225",
       "scale": "millions",
       "occurrences": 3,
+      "found_in": "c-20251231.htm",
       "question": "What was CITIGROUP INC's total revenue for the fiscal year ended December 31, 2025?"
     },
     {
@@ -43,6 +46,7 @@
       "displayed": "21,555",
       "scale": "millions",
       "occurrences": 2,
+      "found_in": "pnc-20241231.htm",
       "question": "What was PNC FINANCIAL SERVICES GROUP, INC.'s total revenue for the fiscal year ended December 31, 2024?"
     },
     {
@@ -54,6 +58,7 @@
       "displayed": "38,410",
       "scale": "millions",
       "occurrences": 1,
+      "found_in": "nke-20260531.htm",
       "question": "What was NIKE, Inc.'s total assets for the fiscal year ended May 31, 2026?"
     },
     {
@@ -65,6 +70,7 @@
       "displayed": "3,576",
       "scale": "millions",
       "occurrences": 1,
+      "found_in": "pru-20251231.htm",
       "question": "What was PRUDENTIAL FINANCIAL INC's net income for the fiscal year ended December 31, 2025?"
     },
     {
@@ -76,6 +82,7 @@
       "displayed": "16,861",
       "scale": "millions",
       "occurrences": 2,
+      "found_in": "ms-20251231.htm",
       "question": "What was MORGAN STANLEY's net income for the fiscal year ended December 31, 2025?"
     },
     {
@@ -87,6 +94,7 @@
       "displayed": "25.68",
       "scale": "units",
       "occurrences": 2,
+      "found_in": "cb-20251231.htm",
       "question": "What was Chubb Ltd's diluted earnings per share for the fiscal year ended December 31, 2025?"
     },
     {
@@ -98,6 +106,7 @@
       "displayed": "53,434",
       "scale": "millions",
       "occurrences": 1,
+      "found_in": "cof-20251231.htm",
       "question": "What was CAPITAL ONE FINANCIAL CORP's total revenue for the fiscal year ended December 31, 2025?"
     },
     {
@@ -109,6 +118,7 @@
       "displayed": "24,530",
       "scale": "millions",
       "occurrences": 1,
+      "found_in": "jnj-20251228.htm",
       "question": "What was JOHNSON & JOHNSON's net cash provided by operating activities for the fiscal year ended December 28, 2025?"
     },
     {
@@ -120,24 +130,32 @@
       "displayed": "53,512",
       "scale": "millions",
       "occurrences": 3,
+      "found_in": "gs-20241231.htm",
       "question": "What was GOLDMAN SACHS GROUP INC's total revenue for the fiscal year ended December 31, 2024?"
     },
     {
-      "id": "xbrl-AAPL-2024-09-28-cash",
+      "id": "xbrl-AAPL-2025-09-27-cash",
       "ticker": "AAPL",
-      "expected": 29943000000,
+      "expected": 35934000000,
       "status": "match",
       "label_in_filing": "Cash and cash equivalents",
-      "displayed": "29,943",
+      "displayed": "35,934",
       "scale": "millions",
       "occurrences": 2,
-      "question": "What was Apple Inc.'s cash and cash equivalents for the fiscal year ended September 28, 2024?"
+      "found_in": "aapl-20250927.htm",
+      "question": "What was Apple Inc.'s cash and cash equivalents for the fiscal year ended September 27, 2025?"
     },
     {
       "id": "xbrl-PGR-2025-12-31-stockholders_equity",
       "ticker": "PGR",
       "expected": 30323000000,
-      "status": "not displayed (no visible tagged figure)"
+      "status": "match",
+      "label_in_filing": "Total shareholders\u2019 equity",
+      "displayed": "30,323",
+      "scale": "millions",
+      "occurrences": 2,
+      "found_in": "pgr-20251231_d2.htm",
+      "question": "What was PROGRESSIVE CORP/OH/'s total stockholders' equity for the fiscal year ended December 31, 2025?"
     },
     {
       "id": "xbrl-ALL-2025-12-31-eps_diluted",
@@ -148,13 +166,20 @@
       "displayed": "38.06",
       "scale": "units",
       "occurrences": 3,
+      "found_in": "all-20251231.htm",
       "question": "What was ALLSTATE CORP's diluted earnings per share for the fiscal year ended December 31, 2025?"
     },
     {
       "id": "xbrl-WFC-2024-12-31-revenue",
       "ticker": "WFC",
       "expected": 82296000000,
-      "status": "not displayed (no visible tagged figure)"
+      "status": "match",
+      "label_in_filing": "Total revenue",
+      "displayed": "82,296",
+      "scale": "millions",
+      "occurrences": 3,
+      "found_in": "wfc-20241231_d2.htm",
+      "question": "What was WELLS FARGO & COMPANY/MN's total revenue for the fiscal year ended December 31, 2024?"
     },
     {
       "id": "xbrl-JPM-2025-12-31-eps_diluted",
@@ -165,6 +190,7 @@
       "displayed": "20.02",
       "scale": "units",
       "occurrences": 2,
+      "found_in": "jpm-20251231.htm",
       "question": "What was JPMORGAN CHASE & CO's diluted earnings per share for the fiscal year ended December 31, 2025?"
     },
     {
@@ -176,6 +202,7 @@
       "displayed": "30,509",
       "scale": "millions",
       "occurrences": 7,
+      "found_in": "bac-20251231.htm",
       "question": "What was BANK OF AMERICA CORP /DE/'s net income for the fiscal year ended December 31, 2025?"
     },
     {
@@ -187,6 +214,7 @@
       "displayed": "54,425",
       "scale": "millions",
       "occurrences": 1,
+      "found_in": "pnc-20241231.htm",
       "question": "What was PNC FINANCIAL SERVICES GROUP, INC.'s total stockholders' equity for the fiscal year ended December 31, 2024?"
     },
     {
@@ -198,6 +226,7 @@
       "displayed": "5.94",
       "scale": "units",
       "occurrences": 2,
+      "found_in": "met-20241231.htm",
       "question": "What was METLIFE INC's diluted earnings per share for the fiscal year ended December 31, 2024?"
     },
     {
@@ -209,6 +238,7 @@
       "displayed": "10,631",
       "scale": "millions",
       "occurrences": 2,
+      "found_in": "ko-20241231.htm",
       "question": "What was COCA COLA CO's net income for the fiscal year ended December 31, 2024?"
     }
   ]

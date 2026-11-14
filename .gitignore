@@ -10,3 +10,6 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+
+# local helper scripts
+run_*.bat

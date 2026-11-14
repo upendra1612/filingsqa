@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 from collections.abc import Callable, Iterator
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,7 @@ SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik10}.json"
 SUBMISSIONS_PAGE_URL = "https://data.sec.gov/submissions/{name}"
 COMPANYFACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik10}.json"
 ARCHIVE_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{acc_nodash}/{doc}"
+INDEX_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{acc_nodash}/{accession}-index.html"
 
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 ONE_DAY_S = 24 * 60 * 60
@@ -43,6 +46,77 @@ def pad_cik(cik: int | str) -> str:
 def archive_url(cik: int | str, accession: str, document: str) -> str:
     """URL of a document inside a filing, e.g. the 10-K's primary HTML file."""
     return ARCHIVE_URL.format(cik=int(cik), acc_nodash=accession.replace("-", ""), doc=document)
+
+
+def filing_index_url(cik: int | str, accession: str) -> str:
+    """The human-readable index page that lists every document in a filing."""
+    return INDEX_URL.format(
+        cik=int(cik), acc_nodash=accession.replace("-", ""), accession=accession
+    )
+
+
+class _TableRows(HTMLParser):
+    """Collect table rows as lists of (cell text, first link in the cell)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.rows: list[list[tuple[str, str | None]]] = []
+        self._row: list[tuple[str, str | None]] | None = None
+        self._text: list[str] = []
+        self._href: str | None = None
+        self._in_cell = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "tr":
+            self._row = []
+        elif tag in ("td", "th") and self._row is not None:
+            self._in_cell, self._text, self._href = True, [], None
+        elif tag == "a" and self._in_cell and self._href is None:
+            self._href = dict(attrs).get("href")
+
+    def handle_endtag(self, tag):
+        if tag in ("td", "th") and self._in_cell and self._row is not None:
+            self._row.append((" ".join("".join(self._text).split()), self._href))
+            self._in_cell = False
+        elif tag == "tr" and self._row is not None:
+            self.rows.append(self._row)
+            self._row = None
+
+    def handle_data(self, data):
+        if self._in_cell:
+            self._text.append(data)
+
+
+def parse_filing_index(html: str) -> list[dict[str, str]]:
+    """Documents listed on a filing's index page: type, description, file name, archive path.
+
+    Columns are located by their header names (Seq, Description, Document, Type), so
+    the parser does not depend on table position or CSS classes.
+    """
+    parser = _TableRows()
+    parser.feed(html)
+    docs: list[dict[str, str]] = []
+    cols: dict[str, int] | None = None
+    for row in parser.rows:
+        names = [text.lower() for text, _ in row]
+        if {"document", "type"} <= set(names):
+            cols = {name: i for i, name in enumerate(names)}
+            continue
+        if cols is None or len(row) <= max(cols["document"], cols["type"]):
+            continue
+        text, href = row[cols["document"]]
+        if not href:
+            continue
+        path = re.sub(r"^/ix\?doc=", "", href)  # iXBRL viewer links wrap the real path
+        docs.append(
+            {
+                "type": row[cols["type"]][0],
+                "description": row[cols["description"]][0] if "description" in cols else "",
+                "document": path.rsplit("/", 1)[-1],
+                "path": path,
+            }
+        )
+    return docs
 
 
 class RateLimiter:
@@ -159,6 +233,17 @@ class EdgarClient:
     def submissions_page(self, name: str) -> dict[str, Any]:
         """Older filings live in extra pages listed under filings.files."""
         return self.get_json(SUBMISSIONS_PAGE_URL.format(name=name), f"submissions/{name}")
+
+    def filing_index(self, cik: int | str, accession: str) -> list[dict[str, str]]:
+        """Documents in a filing. Filings never change, so the page is cached forever."""
+        cache = self.cache_dir / "indexes" / f"{accession}-index.html"
+        if cache.is_file():
+            html = cache.read_text(encoding="utf-8")
+        else:
+            html = self.get_bytes(filing_index_url(cik, accession)).decode("utf-8", "replace")
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(html, encoding="utf-8")
+        return parse_filing_index(html)
 
     def company_facts(self, cik: int | str) -> dict[str, Any]:
         cik10 = pad_cik(cik)
