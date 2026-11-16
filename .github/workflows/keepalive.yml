@@ -1,0 +1,24 @@
+# Keeps the free demo alive: Qdrant Cloud suspends free clusters unused for a week,
+# and Render's free service sleeps when idle. The deep health check queries the vector
+# store but never calls the LLM, so it uses no tokens.
+# Set the repository variable API_URL (Settings -> Secrets and variables -> Actions ->
+# Variables) to the Render service URL to enable it.
+name: Keep demo alive
+
+on:
+  schedule:
+    - cron: "17 6 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    if: vars.API_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake the API and query the vector store
+        run: |
+          for i in 1 2 3; do
+            curl -fsS --max-time 180 "${{ vars.API_URL }}/health?deep=true" && exit 0
+            sleep 30
+          done
+          exit 1

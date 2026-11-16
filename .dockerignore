@@ -1,0 +1,10 @@
+.git
+.venv
+data
+evals
+tests
+docs
+ui
+scripts
+*.bat
+.env

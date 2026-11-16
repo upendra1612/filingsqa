@@ -1,0 +1,22 @@
+# Render Blueprint: Dashboard -> New -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: filingsqa-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false        # entered in the Render dashboard, never committed
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: INDEX_NAME
+        value: baseline
+      - key: RATE_PER_IP_PER_HOUR
+        value: "10"
+      - key: RATE_GLOBAL_PER_DAY
+        value: "300"

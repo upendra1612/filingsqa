@@ -40,3 +40,14 @@ filingsqa-xbrl-questions
 filingsqa-index                  # chunk + embed locally; resumable
 filingsqa-eval --set smoke       # or --set dev / --set full
 ```
+
+## Deploy it for free
+
+| Piece | Host (free tier) | Config |
+|---|---|---|
+| Vector store | Qdrant Cloud, 1 GB cluster | `filingsqa-index --cloud` with `QDRANT_URL`, `QDRANT_API_KEY` in `.env` |
+| API (FastAPI) | Render web service, Docker | `render.yaml`, `Dockerfile`; secrets set in the Render dashboard |
+| Demo page | Streamlit Community Cloud | `ui/app.py`, secret `API_URL` |
+| Keep-alive | GitHub Actions | `.github/workflows/keepalive.yml`, repository variable `API_URL` |
+
+The API limits each visitor to 10 questions an hour and the whole demo to 300 a day, so a public link can't use up the free LLM quota. Render's free service sleeps after 15 idle minutes, so the first question can take about a minute. Qdrant suspends free clusters unused for a week; the keep-alive workflow queries the store every three days without calling the LLM.

@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 import time
@@ -37,7 +38,8 @@ def iter_chunks(manifest: list[dict], words: int, overlap: int):
     for filing in manifest:
         docs = filing.get("documents") or [filing["local_path"]]
         types = ["10-K"] + [e["type"] for e in filing.get("exhibits", [])]
-        for doc, doc_type in zip(docs, types, strict=False):
+        urls = [filing.get("url", "")] + [e.get("url", "") for e in filing.get("exhibits", [])]
+        for doc, doc_type, url in zip(docs, types, urls, strict=False):
             raw = Path(doc).read_text(encoding="utf-8", errors="ignore")
             for i, text in enumerate(fixed_word_chunks(html_to_text(raw), words, overlap)):
                 key = f"{filing['accession']}/{Path(doc).name}/{i}"
@@ -50,6 +52,7 @@ def iter_chunks(manifest: list[dict], words: int, overlap: int):
                     "accession": filing["accession"],
                     "document": Path(doc).name,
                     "doc_type": doc_type,
+                    "url": url,  # the document on sec.gov, for citations in the app
                     "chunk_index": i,
                 }
 
@@ -155,6 +158,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--chunk-words", type=int, default=400)
     ap.add_argument("--overlap", type=int, default=50)
     ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument(
+        "--cloud",
+        action="store_true",
+        help="load into Qdrant Cloud (QDRANT_URL, QDRANT_API_KEY in .env) instead of data/qdrant",
+    )
     args = ap.parse_args(argv)
 
     manifest_path = Path(args.manifest)
@@ -167,7 +175,18 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Loading embedding model {args.model} (downloads once, ~70 MB)...")
     embedder = FastEmbedder(args.model)
-    client = QdrantClient(path=QDRANT_PATH)
+    if args.cloud:
+        from .env import load_dotenv
+
+        load_dotenv()
+        url, key = os.environ.get("QDRANT_URL"), os.environ.get("QDRANT_API_KEY")
+        if not url or not key:
+            print("error: set QDRANT_URL and QDRANT_API_KEY in .env", file=sys.stderr)
+            return 2
+        client = QdrantClient(url=url, api_key=key, timeout=120)
+        print(f"Target: Qdrant Cloud ({url.split('//')[-1].split('.')[0]}...)")
+    else:
+        client = QdrantClient(path=QDRANT_PATH)
     info = build_index(manifest, embedder, client, args.name, args.chunk_words, args.overlap)
     print(
         f"\n{info['chunks']} chunks from {info['filings']} filings in {info['seconds']}s "
