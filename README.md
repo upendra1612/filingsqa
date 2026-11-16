@@ -27,7 +27,12 @@ See [DATA.md](DATA.md) for every source, its license and how to rebuild it.
 
 ## What didn't work
 
-See [docs/experiments.md](docs/experiments.md).
+- **Retrieval, not the model, loses most answers.** On the smoke set the model was right 14 of 16 times when the evidence was retrieved, and 1 of 12 when it wasn't. On the live demo, a question about JPMorgan's headcount pulled up a Wells Fargo director's bio that mentions JPMorgan.
+- **A 0.5% grading tolerance hid wrong answers.** It accepted AIG's $41,162M for the filing's $41,139M, a different line item. Grading now matches the precision the answer states (accuracy 60.0% → 56.7%).
+- **Three companies' financial statements weren't in the corpus at first.** Wells Fargo, U.S. Bancorp and Progressive put them in Exhibit 13, so 42 benchmark questions could not be answered until exhibits were downloaded.
+- **The free model I planned on was retired** (Llama 3.3 70B on Groq, 2026-08-16), so runs now check the model exists before starting.
+
+Every experiment, with its numbers and results file: [docs/experiments.md](docs/experiments.md).
 
 ## Run it locally
 
