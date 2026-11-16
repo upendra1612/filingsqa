@@ -79,7 +79,17 @@ def tiny_index(tmp_path):
     ]
     client = QdrantClient(":memory:")
     embedder = HashEmbedder()
-    info = build_index(manifest, embedder, client, "t", words=8, overlap=2, out_dir=tmp_path)
+    info = build_index(
+        manifest,
+        embedder,
+        client,
+        "t",
+        words=8,
+        overlap=2,
+        out_dir=tmp_path,
+        cache_dir=tmp_path / "cache",
+        progress=lambda *_: None,
+    )
     return client, embedder, info
 
 
@@ -254,3 +264,136 @@ def test_results_are_json_serializable(tiny_index, tmp_path):
         lambda *_: 0,
     )
     json.dumps(summarize(items))
+
+
+def test_index_rebuild_reuses_cached_embeddings(tmp_path):
+    doc = tmp_path / "a.htm"
+    doc.write_text("<p>" + " ".join(f"word{i}" for i in range(50)) + "</p>")
+    manifest = [
+        {
+            "ticker": "A",
+            "company": "A",
+            "report_date": "2025-12-31",
+            "accession": "1",
+            "local_path": doc.as_posix(),
+            "documents": [doc.as_posix()],
+        }
+    ]
+
+    class CountingEmbedder(HashEmbedder):
+        calls = 0
+
+        def embed_documents(self, texts):
+            CountingEmbedder.calls += len(texts)
+            return super().embed_documents(texts)
+
+    emb, client = CountingEmbedder(), QdrantClient(":memory:")
+    kw = dict(
+        words=10, overlap=2, out_dir=tmp_path, cache_dir=tmp_path / "c", progress=lambda *_: 0
+    )
+    first = build_index(manifest, emb, client, "x", **kw)
+    calls_after_first = CountingEmbedder.calls
+    second = build_index(manifest, emb, client, "x", **kw)
+    assert first["embedded_now"] == first["chunks"] and first["reused_from_cache"] == 0
+    assert second["embedded_now"] == 0 and second["reused_from_cache"] == second["chunks"]
+    assert CountingEmbedder.calls == calls_after_first  # nothing re-embedded
+    assert client.count("filingsqa_x").count == second["chunks"]
+
+
+class FakeGetSession(FakeSession):
+    def __init__(self, models, responses=()):
+        super().__init__(responses)
+        self.models = models
+
+    def get(self, url, headers=None, timeout=None):
+        return FakeResp(200, {"data": [{"id": m} for m in self.models]})
+
+
+def test_check_model_lists_alternatives_when_model_is_retired():
+    s = FakeGetSession(["openai/gpt-oss-120b", "openai/gpt-oss-20b"])
+    with pytest.raises(LLMError, match="openai/gpt-oss-120b, openai/gpt-oss-20b"):
+        ChatClient(api_key="k", model="llama-3.3-70b-versatile", session=s).check_model()
+    ChatClient(api_key="k", model="openai/gpt-oss-120b", session=s).check_model()
+
+
+def test_reasoning_models_get_low_effort_and_hidden_reasoning():
+    s = FakeSession([OK, OK])
+    ChatClient(api_key="k", model="openai/gpt-oss-120b", session=s).complete([])
+    body = s.calls[0][1]
+    assert body["reasoning_effort"] == "low" and body["include_reasoning"] is False
+    assert body["max_completion_tokens"] == 1500
+    ChatClient(api_key="k", model="some/other-model", session=s).complete([])
+    assert "reasoning_effort" not in s.calls[1][1]
+
+
+def test_amounts_must_match_at_the_precision_stated():
+    aig = {"category": "numeric_extraction", "expected": {"value": 41_139_000_000, "unit": "USD"}}
+    # the first baseline run's AIG answer: a different line item, 0.06% off
+    assert not grade(aig, "Total equity was $41,162 million [2].", False)["correct"]
+    assert grade(aig, "Shareholders' equity was $41,139 million [2].", False)["correct"]
+    gs = {**aig, "expected": {"value": 41_453_000_000, "unit": "USD"}}
+    assert grade(gs, "Net revenues were $41.45 billion.", False)["correct"]
+    assert not grade(gs, "Net revenues were $41.3 billion.", False)["correct"]
+
+
+def test_daily_limit_stops_instead_of_waiting():
+    from filingsqa.llm import DailyLimitError
+
+    msg = '{"error":{"message":"Rate limit reached ... tokens per day (TPD): Limit 200000"}}'
+    resp = FakeResp(429, headers={"retry-after": "3600"})
+    resp.text = msg
+    with pytest.raises(DailyLimitError):
+        ChatClient(api_key="k", session=FakeSession([resp]), sleep=lambda _: None).complete([])
+
+
+def test_regrade_rescores_saved_answers_without_llm(tmp_path, monkeypatch):
+    from filingsqa import evaluate
+
+    golden = tmp_path / "evals" / "golden"
+    golden.mkdir(parents=True)
+    (tmp_path / "evals" / "results").mkdir()
+    q = {
+        "id": "xbrl-AIG-x",
+        "category": "numeric_extraction",
+        "origin": "xbrl",
+        "question": "q",
+        "expected": {"value": 41_139_000_000, "unit": "USD"},
+        "source": {"ticker": "AIG", "period_end": "2025-12-31"},
+    }
+    (golden / "xbrl_numeric.jsonl").write_text(json.dumps(q) + "\n")
+    hit = {"ticker": "AIG", "period_end": "2025-12-31", "text": "equity | 41,139 |"}
+    item = {
+        "id": q["id"],
+        "category": q["category"],
+        "question": "q",
+        "expected": q["expected"],
+        "answer": "$41,162 million",
+        "abstained": False,
+        "citations": [],
+        "hits": [hit],
+        "latency_ms": 10,
+        "llm_latency_ms": 5,
+        "prompt_tokens": 1,
+        "completion_tokens": 1,
+        "model": "m",
+        "correct": True,
+        "answered": True,
+    }
+    saved = tmp_path / "old.json"
+    saved.write_text(
+        json.dumps(
+            {
+                "config": {"k": 5, "index": {"name": "baseline"}},
+                "config_key": "abc",
+                "set": "smoke",
+                "items": [item],
+            }
+        )
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(evaluate, "GOLDEN", golden)
+    out = evaluate.regrade(saved)
+    data = json.loads(out.read_text())
+    assert data["items"][0]["correct"] is False  # the old grader's false positive is gone
+    assert data["items"][0]["evidence_hit"] is True
+    assert data["summary"]["accuracy"] == 0.0

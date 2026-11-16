@@ -3,8 +3,12 @@
 Configured by environment variables (put them in .env):
     LLM_API_KEY   or GROQ_API_KEY
     LLM_BASE_URL  default https://api.groq.com/openai/v1
-    LLM_MODEL     default llama-3.3-70b-versatile
+    LLM_MODEL     default openai/gpt-oss-120b
 For Gemini: LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+
+Groq retired Llama 3.3 70B for free accounts on 2026-08-16 and recommends
+openai/gpt-oss-120b. Free models change often, so check_model() confirms the model
+exists before a long run starts.
 """
 
 from __future__ import annotations
@@ -17,11 +21,29 @@ from dataclasses import dataclass
 import requests
 
 DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_MODEL = "openai/gpt-oss-120b"
+
+# Reasoning models think before answering. For short cited answers we keep that
+# cheap and leave it out of the reply (Groq docs: "Reasoning" page).
+REASONING_PARAMS = {
+    "openai/gpt-oss": {"reasoning_effort": "low", "include_reasoning": False},
+    "qwen/qwen3": {"reasoning_effort": "none"},
+}
+
+
+def extra_params(model: str) -> dict:
+    for prefix, params in REASONING_PARAMS.items():
+        if model.startswith(prefix):
+            return dict(params)
+    return {}
 
 
 class LLMError(RuntimeError):
     pass
+
+
+class DailyLimitError(LLMError):
+    """The provider's daily token or request quota is used up; try again later."""
 
 
 @dataclass
@@ -31,6 +53,7 @@ class Completion:
     completion_tokens: int
     latency_ms: int
     model: str
+    finish_reason: str = ""
 
 
 class ChatClient:
@@ -52,14 +75,34 @@ class ChatClient:
         self.max_retries = max_retries
         self._sleep = sleep
 
+    def check_model(self) -> None:
+        """Fail fast, with the alternatives, if the configured model is not offered."""
+        resp = self.session.get(
+            f"{self.base_url}/models",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            timeout=30,
+        )
+        if resp.status_code == 401:
+            raise LLMError("API key rejected (HTTP 401): check GROQ_API_KEY in .env")
+        if resp.status_code != 200:
+            raise LLMError(f"could not list models: HTTP {resp.status_code}: {resp.text[:200]}")
+        ids = sorted(m["id"] for m in resp.json().get("data", []))
+        if self.model not in ids:
+            raise LLMError(
+                f"model '{self.model}' is not available on this account. "
+                f"Set LLM_MODEL in .env to one of: {', '.join(ids)}"
+            )
+
     def complete(
-        self, messages: list[dict], temperature: float = 0.0, max_tokens: int = 400
+        self, messages: list[dict], temperature: float = 0.0, max_tokens: int = 1500
     ) -> Completion:
+        # max_tokens leaves room for a reasoning model's hidden thinking
         body = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_completion_tokens": max_tokens,
+            **extra_params(self.model),
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
         for attempt in range(self.max_retries + 1):
@@ -82,6 +125,7 @@ class ChatClient:
                     completion_tokens=int(usage.get("completion_tokens", 0)),
                     latency_ms=int((time.time() - started) * 1000),
                     model=data.get("model", self.model),
+                    finish_reason=data["choices"][0].get("finish_reason") or "",
                 )
             if resp.status_code in (429, 500, 502, 503) and attempt < self.max_retries:
                 # free tiers rate-limit per minute; the server says how long to wait
@@ -90,6 +134,11 @@ class ChatClient:
                     wait = float(retry_after)
                 except ValueError:
                     wait = 2.0**attempt * 5
+                daily = "per day" in resp.text.lower() or "(tpd)" in resp.text.lower()
+                if resp.status_code == 429 and (daily or wait > 300):
+                    raise DailyLimitError(
+                        f"daily limit reached for {self.model} (retry after ~{wait / 3600:.1f} h)"
+                    )
                 self._sleep(min(max(wait, 1.0), 120))
                 continue
             raise LLMError(f"HTTP {resp.status_code}: {resp.text[:300]}")

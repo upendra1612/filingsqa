@@ -48,7 +48,8 @@ class Answer:
     hits: list[Hit]
     prompt_tokens: int = 0
     completion_tokens: int = 0
-    latency_ms: int = 0
+    latency_ms: int = 0  # wall clock, including any rate-limit waits
+    llm_latency_ms: int = 0  # the successful model call alone
     model: str = ""
     raw: str = field(default="", repr=False)
 
@@ -108,6 +109,7 @@ def answer_question(question: str, retriever: Retriever, llm: ChatClient, k: int
         prompt_tokens=out.prompt_tokens,
         completion_tokens=out.completion_tokens,
         latency_ms=int((time.time() - started) * 1000),
+        llm_latency_ms=out.latency_ms,
         model=out.model,
         raw=out.text,
     )

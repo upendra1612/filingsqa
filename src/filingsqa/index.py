@@ -6,12 +6,16 @@ Usage:
 
 Writes data/index/<name>/chunks.jsonl and a Qdrant collection stored under
 data/qdrant (local mode: no server, no account). Re-running replaces the collection.
+Embeddings are cached per document in data/embed_cache, so an interrupted build
+resumes where it stopped.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import sys
 import time
 import uuid
@@ -50,6 +54,12 @@ def iter_chunks(manifest: list[dict], words: int, overlap: int):
                 }
 
 
+def _cache_path(cache_dir: Path, model: str, texts: list[str]) -> Path:
+    """One file per (embedding model, exact list of chunk texts) for a document."""
+    digest = hashlib.sha256(("\x00".join([model, *texts])).encode("utf-8")).hexdigest()[:24]
+    return cache_dir / re.sub(r"[^A-Za-z0-9._-]", "_", model) / f"{digest}.json"
+
+
 def build_index(
     manifest: list[dict],
     embedder: Embedder,
@@ -58,8 +68,15 @@ def build_index(
     words: int = 400,
     overlap: int = 50,
     out_dir: Path = Path("data/index"),
-    batch: int = 256,
+    cache_dir: Path = Path("data/embed_cache"),
+    batch: int = 64,
+    progress=print,
 ) -> dict:
+    """Embed every chunk and load it into a fresh Qdrant collection.
+
+    Embeddings are cached per document, so an interrupted build resumes where it
+    stopped, and rebuilding with the same chunks and model costs only the upload.
+    """
     from qdrant_client import models
 
     coll = collection_name(name)
@@ -70,29 +87,48 @@ def build_index(
     )
     folder = out_dir / name
     folder.mkdir(parents=True, exist_ok=True)
-    n, started, pending = 0, time.time(), []
 
-    def flush():
-        vectors = embedder.embed_documents([c["text"] for c in pending])
-        client.upsert(
-            coll,
-            points=[
-                models.PointStruct(id=c["id"], vector=v, payload=c)
-                for c, v in zip(pending, vectors, strict=True)
-            ],
-        )
-        pending.clear()
-
+    # Group chunks by document: the unit of caching and of progress reporting.
+    docs: dict[tuple[str, str], list[dict]] = {}
+    for chunk in iter_chunks(manifest, words, overlap):
+        docs.setdefault((chunk["accession"], chunk["document"]), []).append(chunk)
+    total = sum(len(c) for c in docs.values())
     with (folder / "chunks.jsonl").open("w", encoding="utf-8") as fh:
-        for chunk in iter_chunks(manifest, words, overlap):
-            fh.write(json.dumps(chunk) + "\n")
-            pending.append(chunk)
-            n += 1
-            if len(pending) >= batch:
-                flush()
-                print(f"  {n} chunks embedded", end="\r", flush=True)
-        if pending:
-            flush()
+        for chunks in docs.values():
+            for c in chunks:
+                fh.write(json.dumps(c) + "\n")
+
+    started, done, embedded, embed_seconds, reused = time.time(), 0, 0, 0.0, 0
+    for (_, doc_name), chunks in docs.items():
+        texts = [c["text"] for c in chunks]
+        cache = _cache_path(cache_dir, embedder.name, texts)
+        if cache.is_file():
+            vectors = json.loads(cache.read_text())
+            reused += len(chunks)
+        else:
+            t = time.time()
+            vectors = []
+            for i in range(0, len(texts), batch):
+                vectors.extend(embedder.embed_documents(texts[i : i + batch]))
+            embed_seconds += time.time() - t
+            embedded += len(chunks)
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps([[round(x, 6) for x in v] for v in vectors]))
+        for i in range(0, len(chunks), 256):
+            client.upsert(
+                coll,
+                points=[
+                    models.PointStruct(id=c["id"], vector=v, payload=c)
+                    for c, v in zip(chunks[i : i + 256], vectors[i : i + 256], strict=True)
+                ],
+            )
+        done += len(chunks)
+        rate = embedded / embed_seconds if embed_seconds else 0.0
+        eta = (total - done) / rate / 60 if rate else 0.0
+        progress(
+            f"  {done:,}/{total:,} chunks ({doc_name})"
+            + (f"  ~{rate:.0f} chunks/s, ~{eta:.0f} min left" if rate else "  (from cache)")
+        )
     info = {
         "name": name,
         "collection": coll,
@@ -101,8 +137,11 @@ def build_index(
         "chunker": "fixed_word_chunks",
         "chunk_words": words,
         "overlap": overlap,
-        "chunks": n,
+        "chunks": total,
+        "documents": len(docs),
         "filings": len(manifest),
+        "embedded_now": embedded,
+        "reused_from_cache": reused,
         "seconds": round(time.time() - started, 1),
     }
     (folder / "index_info.json").write_text(json.dumps(info, indent=2), encoding="utf-8")
@@ -132,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     info = build_index(manifest, embedder, client, args.name, args.chunk_words, args.overlap)
     print(
         f"\n{info['chunks']} chunks from {info['filings']} filings in {info['seconds']}s "
+        f"({info['embedded_now']} embedded now, {info['reused_from_cache']} reused from cache) "
         f"-> collection {info['collection']}"
     )
     return 0

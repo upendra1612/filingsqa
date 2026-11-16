@@ -6,7 +6,9 @@ Usage:
     filingsqa-eval --set full               # every verified question
 
 Grading is deterministic, with no LLM judge:
-- amounts: the first stated amount must be within 0.5% of the filing's figure
+- amounts: the first stated amount must equal the filing's figure at the precision the
+  answer claims ("$41,162 million" must match to the million; "$41.45 billion" must
+  round correctly)
 - percentages: within 0.15 percentage points, with the right direction
 - text facts: every key point must appear in the answer
 - not-answerable questions: correct only if the system says NOT_FOUND
@@ -104,12 +106,14 @@ def unverified_ids(spot_check_path: Path) -> set[str]:
 def numbers_in(text: str) -> list[dict]:
     out = []
     for m in NUM_RE.finditer(text):
-        value = float(m.group("num").replace(",", ""))
-        if m.group("scale"):
-            value *= SCALES[m.group("scale").lower()]
+        raw = m.group("num").replace(",", "")
+        scale = SCALES[m.group("scale").lower()] if m.group("scale") else 1.0
+        decimals = len(raw.split(".")[1]) if "." in raw else 0
         out.append(
             {
-                "value": value,
+                "value": float(raw) * scale,
+                # smallest step the answer states, e.g. "$41.45 billion" -> $10 million
+                "precision": scale * 10**-decimals,
                 "pct": bool(m.group("pct")),
                 "money": bool(m.group("cur") or m.group("scale")),
                 "neg": bool(m.group("neg")),
@@ -152,12 +156,12 @@ def grade(q: dict, answer: str, abstained: bool) -> dict:
     money = [n for n in nums if n["money"]] or nums
     if not money:
         return {"correct": False, "answered": True, "parsed": None}
-    got = money[0]["value"]
-    if exp["unit"] == "USD/shares":
-        ok = abs(got - target) <= 0.005 + 1e-9
-    else:
-        ok = abs(got - abs(target)) <= abs(target) * 0.005
-    return {"correct": ok, "answered": True, "parsed": got}
+    got = money[0]
+    # Correct if the stated figure is the filing's figure rounded to the stated precision.
+    # A 0.5% tolerance was tried first and wrongly accepted $41,162M for $41,139M.
+    tol = got["precision"] / 2 + 1e-9 * max(abs(target), 1.0)
+    ok = abs(got["value"] - abs(target)) <= tol
+    return {"correct": ok, "answered": True, "parsed": got["value"]}
 
 
 def evidence_strings(q: dict) -> list[str]:
@@ -176,16 +180,19 @@ def evidence_strings(q: dict) -> list[str]:
 
 
 def retrieval_hits(q: dict, hits: list[dict]) -> dict:
+    """filing_hit: a passage from the exact filing was retrieved.
+    evidence_hit: the expected figure or quote appears in a retrieved passage from the
+    same company, from any year, because later 10-Ks repeat prior-year figures."""
     src = q["source"]
-    same = [
+    same_filing = [
         h for h in hits if h["ticker"] == src["ticker"] and h["period_end"] == src["period_end"]
     ]
     if q["category"] == "not_answerable":
-        return {"filing_hit": bool(same), "evidence_hit": None}
+        return {"filing_hit": bool(same_filing), "evidence_hit": None}
     needles = evidence_strings(q)
-    text = " ".join(" ".join(h["text"].split()) for h in same)
+    text = " ".join(" ".join(h["text"].split()) for h in hits if h["ticker"] == src["ticker"])
     return {
-        "filing_hit": bool(same),
+        "filing_hit": bool(same_filing),
         "evidence_hit": bool(needles) and all(n in text for n in needles),
     }
 
@@ -214,7 +221,8 @@ def summarize(items: list[dict]) -> dict:
 
     answerable = [r for r in items if r["category"] != "not_answerable"]
     na = [r for r in items if r["category"] == "not_answerable"]
-    lat = [r["latency_ms"] for r in items]
+    lat = [r.get("llm_latency_ms") or r["latency_ms"] for r in items]
+    wall = [r["latency_ms"] for r in items]
     by_cat = {}
     for cat in sorted({r["category"] for r in items}):
         rows = [r for r in items if r["category"] == cat]
@@ -236,8 +244,9 @@ def summarize(items: list[dict]) -> dict:
         "not_answerable_correct": rate(na, "correct"),
         "filing_hit_at_k": rate(answerable, "filing_hit"),
         "evidence_hit_at_k": rate(answerable, "evidence_hit"),
-        "latency_p50_ms": pct(lat, 0.5),
+        "latency_p50_ms": pct(lat, 0.5),  # model call only
         "latency_p95_ms": pct(lat, 0.95),
+        "wall_p50_ms": pct(wall, 0.5),  # including free-tier rate-limit waits
         "prompt_tokens": sum(r["prompt_tokens"] for r in items),
         "completion_tokens": sum(r["completion_tokens"] for r in items),
         "by_category": by_cat,
@@ -265,6 +274,7 @@ def run(questions: list[dict], answer_fn, cache_dir: Path, progress=print) -> li
                 "citations": a.citations,
                 "hits": hits,
                 "latency_ms": a.latency_ms,
+                "llm_latency_ms": a.llm_latency_ms,
                 "prompt_tokens": a.prompt_tokens,
                 "completion_tokens": a.completion_tokens,
                 "model": a.model,
@@ -289,7 +299,14 @@ def main(argv: list[str] | None = None) -> int:
         help="exclude XBRL questions this spot-check could not verify",
     )
     ap.add_argument("--make-splits", action="store_true", help="(re)write evals/golden/splits.json")
+    ap.add_argument(
+        "--regrade", metavar="RESULTS_JSON", help="re-score saved answers, no LLM calls"
+    )
     args = ap.parse_args(argv)
+
+    if args.regrade:
+        regrade(Path(args.regrade))
+        return 0
 
     questions = load_questions()
     if args.make_splits:
@@ -302,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     from .embeddings import FastEmbedder
     from .env import load_dotenv
     from .index import QDRANT_PATH
-    from .llm import ChatClient
+    from .llm import ChatClient, DailyLimitError, extra_params
     from .rag import SYSTEM_PROMPT, Retriever, answer_question
 
     load_dotenv()
@@ -312,14 +329,22 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     info = json.loads(info_path.read_text())
     llm = ChatClient()
+    llm.check_model()
     retriever = Retriever(
         QdrantClient(path=QDRANT_PATH), FastEmbedder(info["embedding_model"]), args.index
     )
+    # Only settings that change answers go in the cache key. Build timings and
+    # cache statistics differ on every rebuild and must not invalidate cached answers.
+    index_settings = {
+        k: info[k]
+        for k in ("name", "embedding_model", "chunker", "chunk_words", "overlap", "chunks")
+    }
     config = {
-        "index": info,
+        "index": index_settings,
         "k": args.k,
         "model": llm.model,
         "base_url": llm.base_url,
+        "llm_params": extra_params(llm.model),
         "prompt_sha": hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest()[:10],
     }
     key = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:12]
@@ -333,48 +358,84 @@ def main(argv: list[str] | None = None) -> int:
         f"{f', excluding {len(excluded)} unverified' if excluded else ''}"
     )
     started = time.time()
-    items = run(
-        qs,
-        lambda text: answer_question(text, retriever, llm, args.k),
-        Path("data/eval_cache") / key,
-    )
-    summary = summarize(items)
-
-    stamp = datetime.now().strftime("%Y%m%d-%H%M")
-    out = Path("evals/results") / f"{stamp}_{git_sha()}_{args.index}_{args.set}.json"
-    out.write_text(
-        json.dumps(
-            {
-                "config": config,
-                "config_key": key,
-                "set": args.set,
-                "git_sha": git_sha(),
-                "excluded": sorted(excluded),
-                "summary": summary,
-                "items": items,
-            },
-            indent=1,
+    cache_dir = Path("data/eval_cache") / key
+    try:
+        items = run(qs, lambda text: answer_question(text, retriever, llm, args.k), cache_dir)
+    except DailyLimitError as exc:
+        done = len(list(cache_dir.glob("*.json")))
+        print(
+            f"\nStopped: {exc}. {done}/{len(qs)} answers are saved; re-run the same "
+            "command after the limit resets to continue."
         )
-    )
-    s = summary
+        return 3
+    summary = summarize(items)
+    write_results(items, summary, config, key, args.set, args.index, excluded)
+    print(f"{time.time() - started:.0f}s total")
+    return 0
+
+
+def write_results(items, summary, config, key, set_name, index, excluded, suffix=""):
+    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    out = Path("evals/results") / f"{stamp}_{git_sha()}_{index}_{set_name}{suffix}.json"
+    payload = {
+        "config": config,
+        "config_key": key,
+        "set": set_name,
+        "git_sha": git_sha(),
+        "excluded": sorted(excluded),
+        "summary": summary,
+        "items": items,
+    }
+    out.write_text(json.dumps(payload, indent=1))
+    print_summary(summary, config.get("k", 5))
+    print(f"-> {out}")
+    return out
+
+
+def print_summary(s: dict, k: int) -> None:
+    def p(v):
+        return "n/a" if v is None else f"{v:.1%}"
+
     print(
-        f"\nAccuracy {s['accuracy']:.1%} | wrong answers {s['wrong_answer_rate']:.1%} | "
-        f"abstained on answerable {s['abstention_rate_answerable']:.1%} | "
-        f"not-answerable caught {s['not_answerable_correct'] or 0:.1%}"
+        f"\nAccuracy {p(s['accuracy'])} | wrong answers {p(s['wrong_answer_rate'])} | "
+        f"abstained on answerable {p(s['abstention_rate_answerable'])} | "
+        f"not-answerable caught {p(s['not_answerable_correct'])}"
     )
     print(
-        f"Retrieval: right filing in top-{args.k} {s['filing_hit_at_k']:.1%}, "
-        f"evidence in top-{args.k} {s['evidence_hit_at_k']:.1%}"
+        f"Retrieval: right filing in top-{k} {p(s['filing_hit_at_k'])}, "
+        f"evidence in top-{k} {p(s['evidence_hit_at_k'])}"
     )
     print(
-        f"Latency p50 {s['latency_p50_ms']} ms, p95 {s['latency_p95_ms']} ms; tokens "
-        f"{s['prompt_tokens']:,} in / {s['completion_tokens']:,} out; "
-        f"{time.time() - started:.0f}s total"
+        f"Model latency p50 {s['latency_p50_ms']} ms, p95 {s['latency_p95_ms']} ms "
+        f"(wall clock incl. rate-limit waits p50 {s.get('wall_p50_ms', 'n/a')} ms); "
+        f"tokens {s['prompt_tokens']:,} in / {s['completion_tokens']:,} out"
     )
     for cat, v in s["by_category"].items():
-        print(f"  {cat:20} n={v['n']:3}  accuracy {v['accuracy']:.1%}")
-    print(f"-> {out}")
-    return 0
+        print(f"  {cat:20} n={v['n']:3}  accuracy {p(v['accuracy'])}")
+
+
+def regrade(path: Path) -> Path:
+    """Re-score saved answers with the current grader. No retrieval or LLM calls."""
+    data = json.loads(path.read_text())
+    questions = load_questions()
+    items = []
+    for item in data["items"]:
+        q = questions[item["id"]]
+        item = {k: v for k, v in item.items() if k not in ("key_point_recall", "parsed")}
+        item.update(grade(q, item["answer"], item["abstained"]))
+        item.update(retrieval_hits(q, item["hits"]))
+        items.append(item)
+    summary = summarize(items)
+    return write_results(
+        items,
+        summary,
+        data["config"],
+        data["config_key"],
+        data["set"],
+        data["config"]["index"]["name"],
+        set(data.get("excluded", [])),
+        suffix="_regraded",
+    )
 
 
 if __name__ == "__main__":
