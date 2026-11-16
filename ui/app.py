@@ -10,10 +10,14 @@ import requests
 import streamlit as st
 
 REPO = "https://github.com/upendra1612/filingsqa"
+# Questions the baseline answered correctly on the smoke set (evals/results), plus one
+# the filings can't answer, to show the system declining instead of guessing.
 EXAMPLES = [
-    "What were Apple's iPhone net sales in fiscal 2025?",
-    "How many employees did JPMorgan Chase have globally as of December 31, 2025?",
-    "By what percentage did Coca-Cola's net income attributable to shareowners change in 2025?",
+    "What were net sales of Apple's Greater China segment in fiscal 2025?",
+    "In which business segments does Goldman Sachs manage and report its activities "
+    "in its 2025 10-K?",
+    "By what percentage did Coca-Cola's net income attributable to shareowners change "
+    "in 2025 compared with 2024?",
     "What was Coca-Cola's market share in India in 2025?",
 ]
 

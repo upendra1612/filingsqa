@@ -2,7 +2,9 @@
 
 > Status: **week 2 of 7** — baseline measured; next: company/year filtering and better chunking.
 
-[Demo video — coming week 7] · [Live app — coming week 2] · [Blog post — coming week 7]
+**[Live demo](https://filingsapp-xrnbraaeqexuhzn5qw22ur.streamlit.app/)** · [API docs](https://filingsqa-api.onrender.com/docs) · [Demo video — coming week 7] · [Blog post — coming week 7]
+
+The demo runs on free tiers: the first question after a quiet spell can take about a minute while the server wakes up.
 
 ## Results
 
