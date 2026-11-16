@@ -19,6 +19,7 @@ import time
 from collections import defaultdict, deque
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -72,6 +73,19 @@ class SlidingWindowLimiter:
                 return False
             q.append(now)
             return True
+
+
+def memory_mb() -> dict:
+    """Current and peak resident memory of this process, in MB (Linux; empty elsewhere)."""
+    out = {}
+    try:
+        for line in Path("/proc/self/status").read_text().splitlines():
+            key, _, value = line.partition(":")
+            if key in ("VmRSS", "VmHWM"):  # current, peak
+                out["now" if key == "VmRSS" else "peak"] = round(int(value.split()[0]) / 1024)
+    except OSError:
+        pass
+    return out
 
 
 def client_ip(request: Request) -> str:
@@ -173,6 +187,8 @@ def create_app(
                 out["chunks"] = state["ping"]()
             except Exception as exc:
                 raise HTTPException(503, f"Vector store unreachable: {type(exc).__name__}") from exc
+            if mem := memory_mb():
+                out["memory_mb"] = mem  # Render's free plan allows 512
         return out
 
     @app.post("/ask", response_model=Reply)

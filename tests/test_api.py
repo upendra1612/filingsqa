@@ -86,7 +86,9 @@ def test_sliding_window_frees_slots_over_time():
 
 def test_deep_health_queries_the_vector_store():
     with TestClient(create_app(answer_fn=fake_answer, info={}, ping=lambda: 17580)) as c:
-        assert c.get("/health?deep=true").json() == {"status": "ok", "chunks": 17580}
+        deep = c.get("/health?deep=true").json()
+        assert deep["chunks"] == 17580
+        assert set(deep.get("memory_mb", {"now": 1, "peak": 1})) == {"now", "peak"}
         assert c.get("/health").json() == {"status": "ok"}
 
     def down():
